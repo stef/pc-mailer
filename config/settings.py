@@ -22,4 +22,6 @@ basepath=os.path.normpath(os.path.dirname(__file__)+'/../..')
 
 sendermail="pc@ctrlc.hu"
 
+botjid="otrbot@xmpp.hsbp.org"
+
 # the config/boot.py will turn these values into variables set in settings
