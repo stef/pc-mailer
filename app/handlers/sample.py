@@ -6,12 +6,14 @@ from lamson.encoding import to_message, to_string, from_string
 from config.settings import relay, basepath, sendermail, botjid
 from lamson import view
 from email.utils import collapse_rfc2231_value
-from pbs import gpg
+from sh import gpg
 from dateutil.parser import parse as dparse
 from lockfile import FileLock
 
 gpg=gpg.bake('--keyring',
              '%s/keys/keyring.pub' % basepath,
+             '--homedir',
+             '%s/.gnupg' % basepath,
              '--no-default-keyring',
              '--secret-keyring',
              '%s/keys/keyring.sec' % basepath)
@@ -23,12 +25,12 @@ def award(text):
             _in="Achievement unlocked %s\n%s" % (text, datetime.datetime.utcnow().isoformat()))
 
 def getpgpmeta(text):
-    logging.info(text)
+    #logging.info(text)
     pgp_data=pgpdump.AsciiData(text)
     res={'sigs':[], 'ids': [], 'keys': []}
     try:
         for pkt in pgp_data.packets():
-            logging.info(pkt)
+            #logging.info(pkt)
             if type(pkt)==pgpdump.packet.PublicKeyPacket:
                 res['pubkey_version']= pkt.pubkey_version
                 res['fingerprint']= pkt.fingerprint
@@ -102,7 +104,7 @@ def UPLOADPK(msg, address=None, host=None):
             ret=gpg('--import',
                     _err_to_out=True,
                     _in=part.get_payload(decode=True))
-            logging.info(ret)
+            #logging.info(ret)
             modifiers=[]
             if res['datetime']>datetime.datetime.utcnow()-datetime.timedelta(days=10):
                 modifiers.append('fresh')
@@ -113,11 +115,12 @@ def UPLOADPK(msg, address=None, host=None):
             # TODO also check if only the owner signature is on it, not also his "friends"
             modifiers.append('keyupper')
             res['award']=award("[%s] - you uploaded your public key." % '-'.join(modifiers))
-            logging.info(res)
+            #logging.info(res)
             welcome = view.respond(res, "pkuploaded.msg",
                            From=sendermail,
                            To=sender,
                            Subject="Welcome to the Privacy Challenge")
+            view.attach(welcome, {}, "pubkey.asc", filename="my key", content_type="application/pgp-keys")
             relay.deliver(welcome)
 
 signed1re=re.compile(r'gpg: Signature made (.*) using (.*) key ID (.*)$')
@@ -140,7 +143,7 @@ def DECODER(msg, address=None, host=None):
         inblock=False
         lines=part.get_payload(decode=True).split('\n')
         i=0
-        logging.info(lines)
+        #logging.info(lines)
         while i<len(lines):
             if not inblock:
                 if lines[i].strip()=='-----BEGIN PGP MESSAGE-----':
@@ -150,7 +153,7 @@ def DECODER(msg, address=None, host=None):
                 if lines[i].strip()=='-----END PGP MESSAGE-----':
                     break
             i+=1
-        logging.info(i)
+        #logging.info(i)
         if i<len(lines):
             res.update(getpgpmeta(part.get_payload(decode=True)))
             ret=gpg('-d',
@@ -172,7 +175,7 @@ def DECODER(msg, address=None, host=None):
                     # gpg: Signature made Fri 11 May 2012 04:43:04 PM CEST using RSA key ID XXXXXX
                     m=signed1re.match(line)
                     if m:
-                        logging.info(m.groups())
+                        #logging.info(m.groups())
                         signed['date']=dparse(str(m.group(1)))
                         signed['algo']=m.group(2)
                         signed['key_id']=m.group(3)
@@ -180,14 +183,14 @@ def DECODER(msg, address=None, host=None):
                     # gpg: Good signature from "name <mail>"
                     m=signed2re.match(line)
                     if m:
-                        logging.info(m.groups())
+                        #logging.info(m.groups())
                         signed['name']=m.group(1)
                         signed['mail']=m.group(2)
                     modifiers.append('signed')
             if signed: res['signed']=signed
             modifiers.append('encrypter')
             res['award']=award("[%s] - you sent an encrypted mail." % '-'.join(modifiers))
-            logging.info(res)
+            #logging.info(res)
             welcome = view.respond(res, "pgpmail.msg",
                            From=sendermail,
                            To=sender,
