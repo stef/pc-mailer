@@ -58,7 +58,7 @@ def getpgpmeta(text):
                 res['keys'].append({'key_id': pkt.key_id,
                                     'pub_algorithm': pkt.pub_algorithm,
                                     'raw_pub_algorithm': pkt.raw_pub_algorithm})
-    except pgpdump.PgpdumpException:
+    except pgpdump.utils.PgpdumpException:
         pass
     return res
 
