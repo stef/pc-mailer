@@ -8,11 +8,11 @@ import os.path
 # for secure connections.
 relay_config = {'host': 'localhost', 'port': 8825}
 
-receiver_config = {'host': 'localhost', 'port': 8823}
+receiver_config = {'host': '', 'port': 25}
 
 handlers = ['app.handlers.sample']
 
-router_defaults = {'host': 'localhost'}
+router_defaults = {'host': 'vps598.greenhost.nl'}
 
 template_config = {'dir': 'app', 'module': 'templates'}
 
@@ -20,8 +20,8 @@ starttls=True
 
 basepath=os.path.normpath(os.path.dirname(__file__)+'/../..')
 
-sendermail="pc@ctrlc.hu"
+sendermail="ono@vps598.greenhost.nl"
 
-botjid="otrbot@xmpp.hsbp.org"
+botjid="ono@xmpp.hsbp.org"
 
 # the config/boot.py will turn these values into variables set in settings
