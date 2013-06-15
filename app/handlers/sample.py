@@ -317,6 +317,41 @@ def otrfp(msg, address=None, host=None):
                            Subject="OTR fingerprint received")
             relay.deliver(welcome)
 
+#@spam_filter(SPAM['db'], SPAM['rc'], SPAM['queue'], next_state=SPAMMING)
+@route("ono@(host)")
+def START(msg, host=None):
+    print 'asdf'
+    sender=collapse_rfc2231_value(msg['from'])
+    #subj=collapse_rfc2231_value(msg['subject'])
+    resp = view.respond({}, "welcome.txt",
+                        From=sendermail,
+                        To=sender,
+                        #Subject="Re: %s" % subj)
+                        Subject="thanks! let's chat")
+    relay.deliver(resp)
+    return JITSI
+
+@route("ono@(host)")
+def JITSI(msg, host=None):
+    sender=collapse_rfc2231_value(msg['from'])
+    resp = view.respond({}, "jitsi.txt",
+                        From=sendermail,
+                        To=sender,
+                        Subject="chatting continued")
+    relay.deliver(resp)
+    return XMPP
+
+@route("ono@(host)")
+def XMPP(msg, host=None):
+    sender=collapse_rfc2231_value(msg['from'])
+    resp = view.respond({'password': 'uniquepassphrase'},
+                           "1stcontact.txt",
+                           From=sendermail,
+                           To=sender,
+                           Subject="start chatting")
+    relay.deliver(resp)
+    return XMPP
+
 #@route_like(START)
 #@route(".+")
 #@stateless
