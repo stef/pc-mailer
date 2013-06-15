@@ -105,16 +105,20 @@ def UPLOADPK(msg, address=None, host=None):
                     _err_to_out=True,
                     _in=part.get_payload(decode=True))
             #logging.info(ret)
-            modifiers=[]
+            modifiers={'fresh': False,
+                       'abbreved': False,
+                       'singleid': False,
+                       'tidy': False,
+                      }
             if res['datetime']>datetime.datetime.utcnow()-datetime.timedelta(days=10):
-                modifiers.append('fresh')
+                modifiers['fresh']=True
             if len(res['ids'])<2:
+                modifiers['singleid']=True
                 if len(res['ids'][0]['email'].split('@')[0])<9:
-                    modifiers.append('abbreved')
-                modifiers.append('singleid')
-            # TODO also check if only the owner signature is on it, not also his "friends"
-            modifiers.append('keyupper')
-            res['award']=award("[%s] - you uploaded your public key." % '-'.join(modifiers))
+                    modifiers['abbreved']=True
+            if len([1 for x in res['sigs'] if x['st'] not in ['Positive certification of a User ID and Public Key packet', 'Subkey Binding Signature']])==0:
+                modifiers['tidy']=True
+            res['award']=award("You uploaded your public key.\n%s" % '\n'.join(["%s [%s]" % (k,'X' if v else ' ') for k,v in modifiers.items()]))
             #logging.info(res)
             welcome = view.respond(res, "pkuploaded.msg",
                            From=sendermail,
@@ -165,10 +169,10 @@ def DECODER(msg, address=None, host=None):
             # extra points,
             #   - no named recipient
             #   - signed
-            modifiers=[]
+            modifiers={'sekrit': False, 'signed': False}
             #logging.info(res['keys'])
             if len([x for x in res['keys'] if x['key_id']!="0000000000000000"])==0:
-                modifiers.append('sekrit')
+                modifiers['sekrit']=True
             signed={}
             for line in ret.stderr.split('\n'):
                 if line.startswith('gpg: Signature made '):
@@ -186,10 +190,9 @@ def DECODER(msg, address=None, host=None):
                         #logging.info(m.groups())
                         signed['name']=m.group(1)
                         signed['mail']=m.group(2)
-                    modifiers.append('signed')
+                    modifiers['signed']=True
             if signed: res['signed']=signed
-            modifiers.append('encrypter')
-            res['award']=award("[%s] - you sent an encrypted mail." % '-'.join(modifiers))
+            res['award']=award("You sent an encrypted mail.\n%s" % '\n'.join(["%s [%s]" % (k,'X' if v else ' ') for k,v in modifiers.items()]))
             #logging.info(res)
             welcome = view.respond(res, "pgpmail.msg",
                            From=sendermail,
@@ -239,16 +242,18 @@ def otrfp(msg, address=None, host=None):
             #   - no named recipient
             #   - signed
             #logging.info(res['keys'])
-            modifiers=[]
+            modifiers={'sekrit': False, 'signed': False}
             if len([x for x in res['keys'] if x['key_id']!="0000000000000000"])==0:
-                modifiers.append('sekrit')
+                modifiers['sekrit']=True
+            else: 
+                logging.warn([x for x in res['keys'] if x['key_id']!="0000000000000000"])
             signed={}
             for line in ret.stderr.split('\n'):
                 if line.startswith('gpg: Signature made '):
                     # gpg: Signature made Fri 11 May 2012 04:43:04 PM CEST using RSA key ID XXXXXX
                     m=signed1re.match(line)
                     if m:
-                        logging.info(m.groups())
+                        #logging.info(m.groups())
                         signed['date']=dparse(str(m.group(1)))
                         signed['algo']=m.group(2)
                         signed['key_id']=m.group(3)
@@ -256,10 +261,10 @@ def otrfp(msg, address=None, host=None):
                     # gpg: Good signature from "name <mail>"
                     m=signed2re.match(line)
                     if m:
-                        logging.info(m.groups())
+                        #logging.info(m.groups())
                         signed['name']=m.group(1)
                         signed['mail']=m.group(2)
-                    modifiers.append('signed')
+                    modifiers['signed']=True
             if not signed:
                 plssign = view.respond(res, "plssign.msg",
                                        From=sendermail,
@@ -268,9 +273,8 @@ def otrfp(msg, address=None, host=None):
                 relay.deliver(plssign)
                 continue
             res['signed']=signed
-            modifiers.append('trustrapper')
-            res['award']=award("[%s]\nyou bootstrapped OTR trust using PGP." % '-'.join(modifiers))
-            logging.info(res)
+            res['award']=award("you bootstrapped OTR trust using PGP.\n%s" % '\n'.join(["%s [%s]" % (k,'X' if v else ' ') for k,v in modifiers.items()]))
+            #logging.info(res)
             jid=None
             fp=None
             secret=None
@@ -280,20 +284,20 @@ def otrfp(msg, address=None, host=None):
                 if jid and fp:
                     secret=line
                     break
-                logging.info("line "+line)
+                #logging.info("line "+line)
                 m=otrfpre.match(line)
                 if m:
-                    logging.info(m.groups())
+                    #logging.info(m.groups())
                     jid, fp = m.group(1), m.group(2)
             if jid and fp:
                 with FileLock('%s/otr/otr/%s.fpr' % (basepath, botjid)):
                     fr=open('%s/otr/otr/%s.fpr' % (basepath, botjid), 'r')
                     fw=open('%s/otr/otr/%s.fpr.new' % (basepath, botjid), 'w')
                     for line in fr:
-                        logging.info(line)
-                        logging.info("%s\t%s\tjabber\t%s" % (jid,
-                                                      botjid,
-                                                      fp.lower().replace(' ','')))
+                        #logging.info(line)
+                        #logging.info("%s\t%s\tjabber\t%s" % (jid,
+                        #                              botjid,
+                        #                              fp.lower().replace(' ','')))
                         if line.startswith("%s\t%s\tjabber\t%s" % (jid,
                                                                    botjid,
                                                                    fp.lower().replace(' ',''))):
