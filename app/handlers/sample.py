@@ -361,10 +361,10 @@ def SECRET(msg, host=None):
 @route("ono@(host)")
 def XMPP(msg, host=None):
     sender=collapse_rfc2231_value(msg['from'])
-    resp = view.respond("1stcontact.txt",
-                           From=sendermail,
-                           To=sender,
-                           Subject="start chatting")
+    resp = view.respond({}, "1stcontact.txt",
+                        From=sendermail,
+                        To=sender,
+                        Subject="start chatting")
     relay.deliver(resp)
     return XMPP
 
