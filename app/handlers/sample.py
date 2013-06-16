@@ -3,7 +3,7 @@
 import logging, re, base64, pgpdump, datetime, os, shutil, random
 from lamson.routing import route, route_like, stateless
 from lamson.encoding import to_message, to_string, from_string
-from config.settings import relay, basepath, sendermail, botjid
+from config.settings import relay, basepath, sendermail, botjid, webhost
 from lamson import view
 from email.utils import collapse_rfc2231_value
 from sh import gpg
@@ -350,7 +350,8 @@ def JITSI(msg, host=None):
 @route("ono@(host)")
 def SECRET(msg, host=None):
     sender=collapse_rfc2231_value(msg['from'])
-    resp = view.respond({}, "fetchsecret.txt",
+    resp = view.respond({'buddyurl': 'https://%s/buddy' % webhost},
+                        "fetchsecret.txt",
                         From=sendermail,
                         To=sender,
                         Subject="getting serious")
