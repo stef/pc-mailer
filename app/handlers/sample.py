@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import logging, re, base64, pgpdump, datetime, os, shutil, random, itertools, hmac, hashlib
+import logging, re, base64, pgpdump, datetime, os, shutil, random
 from lamson.routing import route, route_like, stateless
 from lamson.encoding import to_message, to_string, from_string
 from config.settings import relay, basepath, sendermail, botjid
@@ -11,8 +11,6 @@ from dateutil.parser import parse as dparse
 from lockfile import FileLock
 import struct, sys
 
-with open('config/secret','r') as f:
-    secret=f.read().strip()
 random.seed()
 
 gpg=gpg.bake('--keyring',
@@ -329,7 +327,6 @@ def otrfp(msg, address=None, host=None):
 #@spam_filter(SPAM['db'], SPAM['rc'], SPAM['queue'], next_state=SPAMMING)
 @route("ono@(host)")
 def START(msg, host=None):
-    #return XMPP(msg) # TODO remove this line!!!!5!!!
     sender=collapse_rfc2231_value(msg['from'])
     #subj=collapse_rfc2231_value(msg['subject'])
     resp = view.respond({}, "welcome.txt",
@@ -348,32 +345,22 @@ def JITSI(msg, host=None):
                         To=sender,
                         Subject="chatting continued")
     relay.deliver(resp)
+    return SECRET
+
+@route("ono@(host)")
+def SECRET(msg, host=None):
+    sender=collapse_rfc2231_value(msg['from'])
+    resp = view.respond({}, "fetchsecret.txt",
+                        From=sendermail,
+                        To=sender,
+                        Subject="getting serious")
+    relay.deliver(resp)
     return XMPP
 
 @route("ono@(host)")
 def XMPP(msg, host=None):
     sender=collapse_rfc2231_value(msg['from'])
-
-    # load words
-    wf=open('words','r')
-    words=wf.readlines()
-    wf.close()
-
-    # gen passphrase
-    tmp=[]
-    while len(tmp)<5:
-        tmp.append(words[random.randrange(0,len(words))].strip())
-    del words
-    def deligen():
-        while True:
-            yield random.choice('!@#$%^&*();,"')
-    delim=deligen()
-    password=''.join(itertools.chain.from_iterable(itertools.izip(tmp, delim)))
-    fn="../data/smpsec/%s" % hmac.new(secret, password, hashlib.sha256).hexdigest()
-    with open(fn,'w') as f:
-        f.write("Fantastico now this communication is completed in a secure manner.")
-    resp = view.respond({'password': password},
-                           "1stcontact.txt",
+    resp = view.respond("1stcontact.txt",
                            From=sendermail,
                            To=sender,
                            Subject="start chatting")
