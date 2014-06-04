@@ -9,17 +9,15 @@ from email.utils import collapse_rfc2231_value
 from sh import gpg
 from dateutil.parser import parse as dparse
 from lockfile import FileLock
-import struct, sys
+from game import get_val, second, add_state, get_state
+import struct, sys, hashlib, json
 
 random.seed()
 
-gpg=gpg.bake('--keyring',
-             '%s/keys/keyring.pub' % basepath,
-             '--homedir',
-             '%s/.gnupg' % basepath,
+gpg=gpg.bake('--keyring', '%s/keys/keyring.pub' % basepath,
+             '--homedir', '%s/.gnupg' % basepath,
              '--no-default-keyring',
-             '--secret-keyring',
-             '%s/keys/keyring.sec' % basepath)
+             '--secret-keyring', '%s/keys/keyring.sec' % basepath)
 def award(text):
     return gpg('--clearsign',
             '--armor',
@@ -368,10 +366,45 @@ def XMPP(msg, host=None):
     relay.deliver(resp)
     return XMPP
 
-#@route_like(START)
+@route("ono-dox-(mailid)@(host)")
+@stateless
+def doxer(msg, mailid=None, host=None):
+    found=False
+    keyid=get_val('dox-mailid',":%s" % mailid, second)[:-(len(mailid)+1)]
+    pwd=get_state(keyid, 'prod.pdf.pass')
+    logging.info("pwd "+pwd)
+    for mpart in msg.walk():
+        part=to_message(mpart)
+        if part.get_content_maintype() == 'multipart' or len(part.get_payload(decode=True)) < 268156:
+                continue
+        hash=hashlib.sha256()
+        def hupdate(data): # workaround for http://bugs.python.org/issue17481
+            hash.update(data)
+        ret=gpg('-d',
+                '--passphrase', pwd,
+                _ok_code=[0,2],
+                _in=part.get_payload(decode=True),
+                _out=hupdate)
+        #logging.info('ret '+str(ret))
+        #logging.info('stderr '+ret.stderr)
+        #logging.info('hash '+hash.hexdigest())
+        err=str(ret.stderr) # for flushing the process?
+        if hash.hexdigest() == '658be96015645fe1d646fd167c1ac3bd372360530191d574ace5870c5aeb132f':
+            found=True
+            break
+    if found:
+        #say("thank you")
+        #logging.info('win! found the doc')
+        add_state(keyid, 'prod.pdf.done','1')
+    else:
+        #say("couldn't decode")
+        #logging.info('fail! no doc')
+        add_state(keyid, 'prod.pdf.err',str(ret.stderr))
+
+@route_like(START)
 #@route(".+")
 #@stateless
-#def FORWARD(message, address=None, host=None):
-#    relay.deliver(message)
+def FORWARD(message, address=None, host=None):
+    relay.deliver(message)
 
 
