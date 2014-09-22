@@ -369,14 +369,26 @@ def XMPP(msg, host=None):
 @route("ono-dox-(mailid)@(host)")
 @stateless
 def doxer(msg, mailid=None, host=None):
-    found=False
-    keyid=get_val('dox-mailid',":%s" % mailid, second)[:-(len(mailid)+1)]
+    try:
+        keyid=get_val('dox-mailid',":%s" % mailid, second)[:-(len(mailid)+1)]
+    except TypeError:
+        #print >>sys.stderr, 'nomailid'
+        return # no such mailid
     pwd=get_state(keyid, 'prod.pdf.pass')
-    logging.info("pwd "+pwd)
+    #logging.info("pwd "+pwd)
+    if not pwd:
+        add_state(keyid, 'prod.pdf.err',"I got a mail, but i was not aware of the password at that time. try to resend it after telling me the password please.")
+        return
+    err = None
     for mpart in msg.walk():
         part=to_message(mpart)
-        if part.get_content_maintype() == 'multipart' or len(part.get_payload(decode=True)) < 268156:
-                continue
+        #if part.get_content_maintype() == 'multipart' or len(part.get_payload(decode=True)) < 268125:
+        if part.get_content_maintype() == 'multipart':
+            #print >>sys.stderr, 'skip', len(part.get_payload(decode=True) or ''), part.get_content_maintype()
+            continue
+        size = len(part.get_payload(decode=True))
+        if (size < 200000 or size > 310000):
+            continue
         hash=hashlib.sha256()
         def hupdate(data): # workaround for http://bugs.python.org/issue17481
             hash.update(data)
@@ -385,21 +397,21 @@ def doxer(msg, mailid=None, host=None):
                 _ok_code=[0,2],
                 _in=part.get_payload(decode=True),
                 _out=hupdate)
+        if ret.exit_code!=0:
+            add_state(keyid, 'prod.pdf.err',"got a mail, but gpg had problems, try fixing the problem and resend the mail. gpg said this\n"+err)
+            break
         #logging.info('ret '+str(ret))
         #logging.info('stderr '+ret.stderr)
-        #logging.info('hash '+hash.hexdigest())
         err=str(ret.stderr) # for flushing the process?
+        #print >>sys.stderr, 'err', err
         if hash.hexdigest() == '658be96015645fe1d646fd167c1ac3bd372360530191d574ace5870c5aeb132f':
-            found=True
+            add_state(keyid, 'prod.pdf.done','1')
             break
-    if found:
-        #say("thank you")
-        #logging.info('win! found the doc')
-        add_state(keyid, 'prod.pdf.done','1')
+        else:
+            add_state(keyid, 'prod.pdf.err',"got a mail, but it wasn't quite what i expected, so i dropped it.")
+            break
     else:
-        #say("couldn't decode")
-        #logging.info('fail! no doc')
-        add_state(keyid, 'prod.pdf.err',str(ret.stderr))
+        add_state(keyid, 'prod.pdf.err',"got a mail, but there was nothing found that looked like a reasonably sized pgp payload")
 
 @route_like(START)
 #@route(".+")
